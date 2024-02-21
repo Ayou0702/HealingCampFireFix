@@ -28,37 +28,26 @@ import java.util.List;
 @Mod.EventBusSubscriber(modid = HealingCampFireFix.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class CampfireEvent {
 
-    @SubscribeEvent
-    public void playerTickEvent(TickEvent.PlayerTickEvent e) {
-        Player player = e.player;
-        Level level = player.level();
-        if (level.isClientSide) {
-            return;
-        }
-
-        CampfireEvent.playerTickEvent((ServerLevel)level, (ServerPlayer)player);
-    }
-
     public static void playerTickEvent(ServerLevel world, ServerPlayer player) {
-        if (player.tickCount % ModConfig.checkForCampfireDelayInTicks != 0) {
-            return;
-        }
 
-        List<BlockPos> nearbycampfires = FABFunctions.getAllTaggedTileEntityPositionsNearbyEntity(BlockTags.CAMPFIRES, ModConfig.healingRadius, world, player);
-        if (nearbycampfires.isEmpty()) {
+        List<BlockPos> nearByCampfires = FABFunctions.getAllTaggedTileEntityPositionsNearbyEntity(BlockTags.CAMPFIRES, ModConfig.healingRadius, world, player);
+        if (nearByCampfires.isEmpty()) {
             return;
         }
 
         BlockPos campfire = null;
-        for (BlockPos nearbycampfire : nearbycampfires) {
-            BlockState campfirestate = world.getBlockState(nearbycampfire);
-            Block block = campfirestate.getBlock();
+
+        for (BlockPos nearByCampfire : nearByCampfires) {
+
+            BlockState campFireState = world.getBlockState(nearByCampfire);
+            Block block = campFireState.getBlock();
 
             if (!ModConfig.enableEffectForNormalCampfires) {
                 if (block.equals(Blocks.CAMPFIRE)) {
                     continue;
                 }
             }
+
             if (!ModConfig.enableEffectForSoulCampfires) {
                 if (block.equals(Blocks.SOUL_CAMPFIRE)) {
                     continue;
@@ -66,61 +55,78 @@ public class CampfireEvent {
             }
 
             if (ModConfig.campfireMustBeLit) {
-                Boolean islit = campfirestate.getValue(CampfireBlock.LIT);
-                if (!islit) {
-                    continue;
-                }
-            }
-            if (ModConfig.campfireMustBeSignalling) {
-                Boolean issignalling = campfirestate.getValue(CampfireBlock.SIGNAL_FIRE);
-                if (!issignalling) {
+                Boolean isLit = campFireState.getValue(CampfireBlock.LIT);
+                if (!isLit) {
                     continue;
                 }
             }
 
-            campfire = nearbycampfire.immutable();
+            if (ModConfig.campfireMustBeSignalling) {
+                Boolean isSignalLing = campFireState.getValue(CampfireBlock.SIGNAL_FIRE);
+                if (!isSignalLing) {
+                    continue;
+                }
+            }
+
+            campfire = nearByCampfire.immutable();
             break;
+
         }
 
         if (campfire == null) {
             return;
         }
 
-        BlockPos ppos = player.blockPosition();
-        double r = ModConfig.healingRadius;
-        if (ppos.closerThan(campfire, r)) {
-            boolean addeffect = true;
-            MobEffectInstance currentregen = player.getEffect(MobEffects.REGENERATION);
-            if (currentregen != null) {
-                int currentduration = currentregen.getDuration();
-                if (currentduration > (ModConfig.effectDurationSeconds*10)) {
-                    addeffect = false;
-                }
-            }
+        BlockPos blockPos = player.blockPosition();
+        double radius = ModConfig.healingRadius;
 
-            if (addeffect) {
-                player.addEffect(ModConfig.hideEffectParticles?new MobEffectInstance(MobEffects.REGENERATION, ModConfig.effectDurationSeconds*20, ModConfig.regenerationLevel-1, true, false):new MobEffectInstance(MobEffects.REGENERATION, ModConfig.effectDurationSeconds*20, ModConfig.regenerationLevel-1));
-            }
+        if (blockPos.closerThan(campfire, radius)) {
+            addEffect(player);
         }
+
         if (ModConfig.healPassiveMobs) {
-            for (Entity entity : world.getEntities(player, new AABB(campfire.getX()-r, campfire.getY()-r, campfire.getZ()-r, campfire.getX()+r, campfire.getY()+r, campfire.getZ()+r))) {
+            for (Entity entity : world.getEntities(player, new AABB(campfire.getX() - radius, campfire.getY() - radius, campfire.getZ() - radius, campfire.getX() + radius, campfire.getY() + radius, campfire.getZ() + radius))) {
                 if (entity instanceof LivingEntity le && (!(entity instanceof Player)) && !entity.getType().getCategory().equals(MobCategory.MONSTER)) {
-
-                    boolean addeffect = true;
-                    MobEffectInstance currentregen = le.getEffect(MobEffects.REGENERATION);
-                    if (currentregen != null) {
-                        int currentduration = currentregen.getDuration();
-                        if (currentduration > (ModConfig.effectDurationSeconds*10)) {
-                            addeffect = false;
-                        }
-                    }
-
-                    if (addeffect) {
-                        le.addEffect(ModConfig.hideEffectParticles?new MobEffectInstance(MobEffects.REGENERATION, ModConfig.effectDurationSeconds*20, ModConfig.regenerationLevel-1, true, false):new MobEffectInstance(MobEffects.REGENERATION, ModConfig.effectDurationSeconds*20, ModConfig.regenerationLevel-1));
-                    }
+                    addEffect(le);
                 }
             }
         }
+
     }
-    
+
+    private static void addEffect(LivingEntity entity) {
+
+        boolean addEffect = true;
+        MobEffectInstance effectInstance = entity.getEffect(MobEffects.REGENERATION);
+        if (effectInstance != null) {
+            int duration = effectInstance.getDuration();
+            if (duration > (ModConfig.effectDurationSeconds * 10)) {
+                addEffect = false;
+            }
+        }
+
+        if (addEffect) {
+            entity.addEffect(ModConfig.hideEffectParticles ? new MobEffectInstance(MobEffects.REGENERATION, ModConfig.effectDurationSeconds * 20, ModConfig.regenerationLevel - 1, true, false) : new MobEffectInstance(MobEffects.REGENERATION, ModConfig.effectDurationSeconds * 20, ModConfig.regenerationLevel - 1));
+        }
+
+    }
+
+    @SubscribeEvent
+    public void playerTickEvent(TickEvent.PlayerTickEvent e) {
+
+        Player player = e.player;
+        Level level = player.level();
+
+        if (level.isClientSide) {
+            return;
+        }
+
+        if (player.tickCount % ModConfig.checkForCampfireDelayInTicks != 0) {
+            return;
+        }
+
+        CampfireEvent.playerTickEvent((ServerLevel) level, (ServerPlayer) player);
+
+    }
+
 }

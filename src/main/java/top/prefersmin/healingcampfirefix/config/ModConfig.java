@@ -1,10 +1,15 @@
 package top.prefersmin.healingcampfirefix.config;
 
+import com.electronwill.nightconfig.core.file.CommentedFileConfig;
+import com.electronwill.nightconfig.core.io.WritingMode;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
+import net.minecraftforge.fml.loading.FMLPaths;
 import top.prefersmin.healingcampfirefix.HealingCampFireFix;
+
+import java.nio.file.Path;
 
 @Mod.EventBusSubscriber(modid = HealingCampFireFix.MODID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public class ModConfig {
@@ -51,8 +56,6 @@ public class ModConfig {
             .comment("启用灵魂营火效果")
             .define("enableEffectForSoulCampfires", true);
 
-    public static final ForgeConfigSpec SPEC = BUILDER.build();
-
     public static int checkForCampfireDelayInTicks;
     public static int healingRadius;
     public static int effectDurationSeconds;
@@ -63,6 +66,10 @@ public class ModConfig {
     public static boolean campfireMustBeSignalling;
     public static boolean enableEffectForNormalCampfires;
     public static boolean enableEffectForSoulCampfires;
+
+    public static final ForgeConfigSpec SPEC = BUILDER.build();
+
+    public static final Path path = FMLPaths.CONFIGDIR.get().resolve(HealingCampFireFix.MODID + "-common.toml");
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
@@ -76,6 +83,32 @@ public class ModConfig {
         campfireMustBeSignalling = CAMPFIRE_MUST_BE_SIGNALLING.get();
         enableEffectForNormalCampfires = ENABLE_EFFECT_FOR_NORMAL_CAMPFIRES.get();
         enableEffectForSoulCampfires = ENABLE_EFFECT_FOR_SOUL_CAMPFIRES.get();
+    }
+
+    /**
+     * 自动监听配置文件重载事件，并通过重载事件重载配置文件
+     *
+     * @param event 事件
+     */
+    @SubscribeEvent
+    public void onConfigReload(ModConfigEvent.Reloading event) {
+        if (event.getConfig().getType() == net.minecraftforge.fml.config.ModConfig.Type.COMMON) {
+            SPEC.setConfig(event.getConfig().getConfigData());
+        }
+    }
+
+    /**
+     * 手动重载配置文件
+     */
+    public static void reloadConfig() {
+
+        // 创建并加载配置文件
+        CommentedFileConfig commentedFileConfig = CommentedFileConfig.builder(path).sync().autosave().writingMode(WritingMode.REPLACE).build();
+        commentedFileConfig.load();
+
+        // 设置新的配置文件
+        SPEC.setConfig(commentedFileConfig);
+
     }
 
 }
